@@ -80,8 +80,16 @@ fn SplitByPositions(positions: vec<u16>, src: &str) -> Vec<Option<&str>>{
     let mut start = positions[0];// 0usize;
     let mut strEnd;
     let vs = Vec::<&str>::with_capacity(colCount);
+    // Since positions is starting positions, our last column will need to be populated after this loop.
     for p in positions.iter().enumerate(){
         if p==lp && p == start {
+            if start > 0{
+               match colIndices.nth(start){
+                  Some(s, _) => start = s,
+                  None =>,
+               };
+            }
+             
             continue;// Columns positions are start of column, rather than end of column.
         }
         let endingIndex = p - lp;
@@ -93,7 +101,7 @@ fn SplitByPositions(positions: vec<u16>, src: &str) -> Vec<Option<&str>>{
                 vs.push(Some(&s));
                 start = colEnd; // Note: should be exclusive ending position, so should not need to modify before assigning to start
             },
-            None =>  vs.push(None);
+            None =>  vs.push(None),
         };
         /*example: Field1   Field2 Field3  (EOL)
         Start at 0, then we want to look for the position of F in Field2 (10,  field 1 is len 9)
@@ -111,8 +119,8 @@ fn SplitByPositions(positions: vec<u16>, src: &str) -> Vec<Option<&str>>{
         */
         lp = p;
     }
-    //Get last index of line, if any are remaining
-    while{
+    //Get content of last column in line, or None if we finished the string while going through previous columns
+    loop{
         match colIndices.next(){
             Some(colEnd, _) => strEnd = colEnd,
             None=> break,

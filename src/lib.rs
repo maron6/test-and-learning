@@ -1,20 +1,25 @@
 #![crate_type = "lib"]
-use std::env;
-use std::fs;
+use std::*;
+
+use io::Error;
+
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }
 pub enum FileType{
-    Delimited(delimited: char),
-    FixWidth(positions: Vec<u16>)
+    Delimited { delimiter: char },
+    FixWidth { positions: Vec<u16>}
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct CellContent{
     
 }
+
+#[derive(Debug, Clone)]
 pub struct LineContent{
-    pub Cells : Vec<CellContent>
+    pub cells : Vec<CellContent>
     
 }
 /*
@@ -26,29 +31,31 @@ ToDo:
      * Support modifying a cell's content, and modifying some tracker on the FileInfo? 
          Could potentially just flag the FileInfo as modified as an indication that we have anything to write
   */
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 // #[derive(Debug)]
-pub struct FileInfo{
-    pub Path: &str,
-    pub FileType: FileType,
-    pub HasHeader: bool,
-    pub Header: Option<LineContent>
+pub struct FileInfo<'a>{
+    pub path: &'a str,
+    pub file_type: FileType,
+    pub has_header: bool,
+    pub header: Option<LineContent>
 }
 impl FileInfo{
-    fn Load(&mut self) -> Vec<LineContent>{
-        let mut lineCount = 0;
-        let mut headerLine = None(LineContent);
+    fn load(&mut self) -> Vec<LineContent>{
+        let mut line_count = 0;
+        let mut header_line = None::<LineContent>;
         let mut output = Vec::<LineContent>::new();
-        let content = fs::read_to_string(self.Path);
-        assert_ne!(Err, content, "Unable to read file");
+        let content = fs::read_to_string(* self.path);
+        if let Error = content{
+            panic!("Unable to read file at {}", * self.path);
+        }
         for text in content.lines(){
-            let mut Vec<&str> cellSplit;
+            let mut cell_split = Vec::<&str>::new();
             match self.FileType{
-                 FileType.Delimited(delim) => cellSplit = SplitDelimited(),
-                 FileType.FixWidth(positions) => cellSplit = 
+                 FileType::Delimited(delim) => cellSplit = SplitDelimited(delim, text),
+                 FileType::FixWidth(positions) => cellSplit = 
             };
             let line = LineContent::new(cellSplit);
-            if lineContent == 0 {
+            if line_count == 0 {
                 if self.HasHeader{
                     self.Header = Some(line);
                 }
@@ -60,9 +67,10 @@ impl FileInfo{
             else{
                 output.push(line);
             }
-            lineCount ++;
+            lineCount = lineCount + 1;
             
-        }
+        };
+        output
     }
 }
 fn SplitDelimited(delim: char, src: &str) -> Vec<Option<&str>>{
@@ -143,5 +151,10 @@ mod tests {
     fn it_works() {
         let result = add(2, 2);
         assert_eq!(result, 4);
+    }
+    fn test_column_parse_positions(){
+        let cols = [4, 9, 14, 21];
+        let input = "Col1Start Col2Next to last column"
+        let vs = SplitByPositions(positions, input );
     }
 }

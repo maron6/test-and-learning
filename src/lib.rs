@@ -7,17 +7,21 @@ pub fn add(left: usize, right: usize) -> usize {
     left + right
 }
 #[derive(Debug, Clone)]
-pub enum FileType {
+pub enum FileType<'p> {
     Delimited { delimiter: char },
-    FixWidth { positions: Vec<u16> },
+    FixWidth { positions: &'p Vec<u16> },
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct CellContent {}
+// pub trait CellContent {}
 
 #[derive(Debug, Clone)]
-pub struct LineContent {
-    pub cells: Vec<CellContent>,
+pub struct LineContent<'s> {
+    pub cells: Vec<Option<&'s str>>,
+}
+impl<'s> LineContent<'s> {
+    fn new(line_cells: Vec<Option<&str>>) -> LineContent {
+        LineContent { cells: line_cells }
+    }
 }
 /*
 ToDo:
@@ -28,49 +32,62 @@ ToDo:
      * Support modifying a cell's content, and modifying some tracker on the FileInfo?
          Could potentially just flag the FileInfo as modified as an indication that we have anything to write
   */
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 // #[derive(Debug)]
-pub struct FileInfo<'a> {
+pub struct FileInfo<'a, 's, 'p> {
     pub path: &'a str,
-    pub file_type: FileType,
+    pub file_type: FileType<'p>,
     pub has_header: bool,
-    pub header: Option<LineContent>,
+    pub header: Option<LineContent<'s>>,
+    file_content: Result<String, Error>,
 }
-impl<'a> FileInfo<'a> {
+impl<'a, 's, 'p> FileInfo<'a, 's, 'p> {
+    fn set_header(&mut self, line: Option<LineContent<'s>>) {
+        self.header = line;
+    }
     fn load(&mut self) -> Vec<LineContent> {
         let mut line_count = 0;
-        let mut header_line = None::<LineContent>;
+        // let mut header_line = None::<LineContent>;
         let mut output = Vec::<LineContent>::new();
-        let file_result = fs::read_to_string(&self.path);
-        let content = match file_result {
-            Ok(content) => content,
-            Err(e) => panic!("Unable to read file at {}", &self.path),
-        };
-        // ToDo: get content as string instead of Result
-        for text in content.lines() {
-            let mut cell_split = match self.file_type {
-                FileType::Delimited { delimiter } => split_delimited(delimiter, text),
-                FileType::FixWidth { positions } => split_by_positions(positions, text),
-            };
-            let line = LineContent::new(cell_split);
-            if line_count == 0 {
-                if self.has_header {
-                    self.header = Some(line);
-                } else {
-                    self.header = None;
-                    output.push(line);
-                }
-            } else {
+        self.file_content = fs::read_to_string(&self.path); //.expect("unable to read file")
+                                                            //following approach does not really work quite right because the content is pointing to cont, but cont's lifetime is inside of the match.
+                                                            /*
+                                                            let content = match &file_result {
+                                                                Ok(ref cont) => cont,
+                                                                //For now, if any error while parsing file, treat as empty, no data. Potentially change to return a Result<Vec<LineContent>> could be better, though...
+                                                                //But for purposes of using this, likely any empty file handling should potentially be the same as having had a file error.
+                                                                // This is primarily just for learning, though, so not expecting any practical usage of this.
+                                                                Err(ref _e) => "", // panic!("Unable to read file at {} - {}", &self.path, e),
+                                                            };*/
+        if let Ok(ref content) = self.file_content {
+            for text in content.lines() {
+                let cell_split = match self.file_type {
+                    FileType::Delimited { delimiter } => split_delimited(delimiter, &text),
+                    FileType::FixWidth { positions } => split_by_positions(positions, &text),
+                };
+                let line = LineContent::new(cell_split);
                 output.push(line);
+                if line_count == 0 {
+                    if self.has_header {
+                        // self.set_header(output.pop());
+                        // Need to figure out lifetime of the line here, since not using a vec...
+                        // Potentially need to look into RC? Or just add it into a Vec..That seems like unnecessary overhead, though?
+                        // self.header = mem::take(output.pop());
+                        // self.header = Some(LineContent::new(cell_split.clone()));
+                        self.header = Some(line);
+                    } else {
+                        self.header = None;
+                    }
+                }
+                line_count = line_count + 1;
             }
-            line_count = line_count + 1;
         }
         output
     }
 }
 fn split_delimited(delim: char, src: &str) -> Vec<Option<&str>> {}
 //Might need to change this to Vec<Option<string>> ? Need to research a bit more and practice with borrow/ownership of string content
-fn split_by_positions(positions: Vec<u16>, src: &str) -> Vec<Option<&str>> {
+fn split_by_positions<'a>(positions: &Vec<u16>, src: &'a str) -> Vec<Option<&'a str>> {
     let mut lp = 0u16;
     let mut col_count = positions.len();
     // if positions[colCount] == src.len(){

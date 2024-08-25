@@ -22,6 +22,7 @@ impl<'s> LineContent<'s> {
     fn new(line_cells: Vec<Option<&str>>) -> LineContent {
         LineContent { cells: line_cells }
     }
+    // fn get_cells() -> Vec<Option<&str>> {}
 }
 /*
 ToDo:
@@ -34,18 +35,18 @@ ToDo:
   */
 #[derive(Debug)]
 // #[derive(Debug)]
-pub struct FileInfo<'a, 's, 'p> {
-    pub path: &'a str,
-    pub file_type: FileType<'p>,
+pub struct FileInfo<'f> {
+    pub path: &'f str,
+    pub file_type: FileType<'f>,
     pub has_header: bool,
-    pub header: Option<LineContent<'s>>,
+    pub header: Option<LineContent<'f>>,
     file_content: Result<String, Error>,
 }
-impl<'a, 's, 'p> FileInfo<'a, 's, 'p> {
-    fn set_header(&mut self, line: Option<LineContent<'s>>) {
+impl<'f> FileInfo<'f> {
+    fn set_header(&mut self, line: Option<LineContent<'f>>) {
         self.header = line;
     }
-    fn load(&mut self) -> Vec<LineContent> {
+    fn load(&'f mut self) -> Vec<LineContent> {
         let mut line_count = 0;
         // let mut header_line = None::<LineContent>;
         let mut output = Vec::<LineContent>::new();
@@ -66,7 +67,6 @@ impl<'a, 's, 'p> FileInfo<'a, 's, 'p> {
                     FileType::FixWidth { positions } => split_by_positions(positions, &text),
                 };
                 let line = LineContent::new(cell_split);
-                output.push(line);
                 if line_count == 0 {
                     if self.has_header {
                         // self.set_header(output.pop());
@@ -75,10 +75,13 @@ impl<'a, 's, 'p> FileInfo<'a, 's, 'p> {
                         // self.header = mem::take(output.pop());
                         // self.header = Some(LineContent::new(cell_split.clone()));
                         self.header = Some(line);
+                        line_count = line_count + 1;
+                        continue;
                     } else {
                         self.header = None;
                     }
                 }
+                output.push(line);
                 line_count = line_count + 1;
             }
         }

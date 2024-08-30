@@ -112,7 +112,7 @@ pub mod cell_doc {
     }
     //Might need to change this to Vec<Option<string>> ? Need to research a bit more and practice with borrow/ownership of string content
     pub fn split_by_positions<'a>(positions: &Vec<u16>, src: &'a str) -> Vec<Option<&'a str>> {
-        let mut lp = 0u16;
+        // let mut lp = 0u16;
         let col_count = positions.len();
         // if positions[colCount] == src.len(){
         //    colCount = colCount - 1;
@@ -120,12 +120,30 @@ pub mod cell_doc {
         assert_ne!(0, col_count);
         let mut col_indices = src.char_indices();
         let mut start = positions[0]; // 0usize;
+        let mut lp = start;
         let mut str_end: usize = 0;
         let mut vs = Vec::<Option<&str>>::with_capacity(col_count);
         // Since positions is starting positions, our last column will need to be populated after this loop.
         for pos_iter in positions.iter().enumerate() {
-            let (pos, _) = pos_iter;
-            let p = pos as u16;
+            // index, value
+            let (idx, pos) = pos_iter;
+            if idx == 0 {
+                // lp = *pos;
+                continue; // Positions contains starting indexes for columns.
+                          /* Last column contains starting point for an extra column
+                           So Col2 - Col1 -> Col1 slice
+                           Col3 - Col2 = Col2 Slice
+                           ..
+                           Coln.. = ColN slice
+                          */
+            }
+
+            let p = *pos;
+            println!("Pos_iter: {:?}", pos);
+            // Compare position against the last position
+            // Last Position - Previous Position gives us the length of string..
+            // First time
+            /*
             if p == lp && p == start {
                 if start > 0 {
                     if let Some(s) = col_indices.nth(start as usize) {
@@ -133,13 +151,24 @@ pub mod cell_doc {
                     }
                 }
                 continue; // Columns positions are start of column, rather than end of column.
+            }*/
+
+            // +1 because range is exclusive on right side of range
+            // let ending_index = u16::from(p) - lp + 1;// p - lp + 1 is actually the length of the column, not the index information
+            let ending_index = p + 1; // exclusive on right side.
+
+            if let Some(s) = col_indices.nth(lp as usize) {
+                start = s.0 as u16;
             }
-            let ending_index = u16::from(p) - lp;
 
             match col_indices.nth(usize::from(ending_index)) {
-                Some(colEnd) => {
+                Some(col_end) => {
                     let st = usize::from(start);
-                    let (end, _) = colEnd;
+                    let (mut end, _) = col_end;
+                    println!("Start:{:?}, End:{:?}", st, end);
+                    if end < st {
+                        end = end + st;
+                    }
                     let s = &src[st..end];
                     vs.push(Some(&s));
                     start = end as u16; // Note: should be exclusive ending position, so should not need to modify before assigning to start
@@ -160,7 +189,7 @@ pub mod cell_doc {
                 20..
 
                 */
-            lp = p;
+            lp = ending_index; // Set next column to start where this one stopped
         }
         //Get content of last column in line, or None if we finished the string while going through previous columns
         loop {
@@ -190,11 +219,17 @@ mod tests {
     // }
     #[test]
     fn test_column_parse_positions() {
-        let cols = vec![4u16, 9u16, 14u16, 21u16];
+        // let cols = vec![4u16, 9u16, 14u16, 21u16];
+        let cols = vec![4u16, 10u16, 14u16, 22u16];
         let expected_count = cols.len();
-        let input = "Col1Start Col2Next to last column";
+        let input = "Col1Start Col2Next to Last column";
+        // Col1Start Col2Next to Last column
         let vs = cell_doc::split_by_positions(&cols, input);
         let col_count_actual = vs.len();
+        for v in vs {
+            // let val = v.as_ref();
+            println!("{:?}", v);
+        }
         assert_eq!(col_count_actual, expected_count);
     }
 }
